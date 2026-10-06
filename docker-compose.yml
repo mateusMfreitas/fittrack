@@ -1,0 +1,36 @@
+services:
+  fittrack:
+    build: .
+    container_name: fittrack
+    restart: unless-stopped
+    environment:
+      # Defina no Dokploy (aba Environment). Gere o hash com: npm run hash-password -- "sua-senha"
+      - APP_PASSWORD_HASH=${APP_PASSWORD_HASH:?defina APP_PASSWORD_HASH}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+      - TZ=America/Sao_Paulo
+    volumes:
+      - fittrack-data:/app/data
+      # Backups no host, FORA do volume gerenciado: se fittrack-data for removido,
+      # os backups sobrevivem.
+      - ${BACKUP_HOST_DIR:-/opt/fittrack-backups}:/app/backups
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fittrack.rule=Host(`${FITTRACK_DOMAIN:?defina FITTRACK_DOMAIN}`)"
+      - "traefik.http.routers.fittrack.entrypoints=websecure"
+      - "traefik.http.routers.fittrack.tls.certresolver=letsencrypt"
+      - "traefik.http.services.fittrack.loadbalancer.server.port=3000"
+      # http:// redireciona para https:// (sem isto, abrir o domínio sem https dá 404)
+      - "traefik.http.routers.fittrack-http.rule=Host(`${FITTRACK_DOMAIN}`)"
+      - "traefik.http.routers.fittrack-http.entrypoints=web"
+      - "traefik.http.routers.fittrack-http.middlewares=fittrack-https"
+      - "traefik.http.middlewares.fittrack-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.fittrack-https.redirectscheme.permanent=true"
+    networks:
+      - dokploy-network
+
+volumes:
+  fittrack-data:
+
+networks:
+  dokploy-network:
+    external: true
